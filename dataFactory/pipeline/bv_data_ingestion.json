@@ -1,0 +1,334 @@
+{
+	"name": "bv_data_ingestion",
+	"properties": {
+		"activities": [
+			{
+				"name": "Lookup1",
+				"type": "Lookup",
+				"dependsOn": [],
+				"policy": {
+					"timeout": "0.12:00:00",
+					"retry": 0,
+					"retryIntervalInSeconds": 30,
+					"secureOutput": false,
+					"secureInput": false
+				},
+				"userProperties": [],
+				"typeProperties": {
+					"source": {
+						"type": "AzureSqlSource",
+						"queryTimeout": "02:00:00",
+						"partitionOption": "None"
+					},
+					"dataset": {
+						"referenceName": "DS_bv_lp",
+						"type": "DatasetReference"
+					},
+					"firstRowOnly": false
+				}
+			},
+			{
+				"name": "ForEach1",
+				"type": "ForEach",
+				"dependsOn": [
+					{
+						"activity": "Lookup1",
+						"dependencyConditions": [
+							"Succeeded"
+						]
+					}
+				],
+				"userProperties": [],
+				"typeProperties": {
+					"items": {
+						"value": "@activity('Lookup1').output.value",
+						"type": "Expression"
+					},
+					"isSequential": true,
+					"activities": [
+						{
+							"name": "getTableName",
+							"type": "SetVariable",
+							"dependsOn": [],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "table_name",
+								"value": {
+									"value": "@item().table_name",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "getTableType",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "getTableName",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "table_type",
+								"value": {
+									"value": "@item().table_type",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "getIncrementalCol",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "getTableType",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "incremental_col",
+								"value": {
+									"value": "@item().incremental_col",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "getIngestionDate",
+							"type": "SetVariable",
+							"dependsOn": [
+								{
+									"activity": "getIncrementalCol",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"variableName": "ingestion_dt",
+								"value": {
+									"value": "@item().ingestion_dt",
+									"type": "Expression"
+								}
+							}
+						},
+						{
+							"name": "If Condition1",
+							"type": "IfCondition",
+							"dependsOn": [
+								{
+									"activity": "getIngestionDate",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"userProperties": [],
+							"typeProperties": {
+								"expression": {
+									"value": "@equals(variables('table_type'),'fullsync')",
+									"type": "Expression"
+								},
+								"ifFalseActivities": [
+									{
+										"name": "getQuery1",
+										"type": "SetVariable",
+										"dependsOn": [],
+										"policy": {
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "query",
+											"value": {
+												"value": "@concat(\n    'select * from veerab62.',\n    variables('table_name'),\n    ' where ',\n    variables('incremental_col'),\n    ' = ',\n    '''',\n    variables('ingestion_dt'),\n    ''''\n)",
+												"type": "Expression"
+											}
+										}
+									},
+									{
+										"name": "getTargetFileName",
+										"type": "SetVariable",
+										"dependsOn": [
+											{
+												"activity": "getQuery1",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "targetfilename",
+											"value": {
+												"value": "@concat(variables('table_name'),'_',formatDateTime(variables('ingestion_dt'),'ddMMyyyy'),'.json')",
+												"type": "Expression"
+											}
+										}
+									}
+								],
+								"ifTrueActivities": [
+									{
+										"name": "getQuery",
+										"type": "SetVariable",
+										"dependsOn": [],
+										"policy": {
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "query",
+											"value": {
+												"value": "@concat('select * from veerab62.',variables('table_name'))",
+												"type": "Expression"
+											}
+										}
+									},
+									{
+										"name": "getTargetfilename1",
+										"type": "SetVariable",
+										"dependsOn": [
+											{
+												"activity": "getQuery",
+												"dependencyConditions": [
+													"Succeeded"
+												]
+											}
+										],
+										"policy": {
+											"secureOutput": false,
+											"secureInput": false
+										},
+										"userProperties": [],
+										"typeProperties": {
+											"variableName": "targetfilename",
+											"value": {
+												"value": "@concat(variables('table_name'),'.json')",
+												"type": "Expression"
+											}
+										}
+									}
+								]
+							}
+						},
+						{
+							"name": "Copy data1",
+							"type": "Copy",
+							"dependsOn": [
+								{
+									"activity": "If Condition1",
+									"dependencyConditions": [
+										"Succeeded"
+									]
+								}
+							],
+							"policy": {
+								"timeout": "0.12:00:00",
+								"retry": 0,
+								"retryIntervalInSeconds": 30,
+								"secureOutput": false,
+								"secureInput": false
+							},
+							"userProperties": [],
+							"typeProperties": {
+								"source": {
+									"type": "AzureSqlSource",
+									"sqlReaderQuery": {
+										"value": "@variables('query')",
+										"type": "Expression"
+									},
+									"queryTimeout": "02:00:00",
+									"partitionOption": "None"
+								},
+								"sink": {
+									"type": "JsonSink",
+									"storeSettings": {
+										"type": "AzureBlobFSWriteSettings"
+									},
+									"formatSettings": {
+										"type": "JsonWriteSettings"
+									}
+								},
+								"enableStaging": false
+							},
+							"inputs": [
+								{
+									"referenceName": "ds_az_sql_db",
+									"type": "DatasetReference"
+								}
+							],
+							"outputs": [
+								{
+									"referenceName": "Json1",
+									"type": "DatasetReference",
+									"parameters": {
+										"foldername": {
+											"value": "@variables('table_name')",
+											"type": "Expression"
+										},
+										"filename": {
+											"value": "@variables('targetfilename')",
+											"type": "Expression"
+										}
+									}
+								}
+							]
+						}
+					]
+				}
+			}
+		],
+		"variables": {
+			"table_name": {
+				"type": "String"
+			},
+			"table_type": {
+				"type": "String"
+			},
+			"incremental_col": {
+				"type": "String"
+			},
+			"ingestion_dt": {
+				"type": "String"
+			},
+			"query": {
+				"type": "String"
+			},
+			"targetfilename": {
+				"type": "String"
+			}
+		},
+		"annotations": [],
+		"lastPublishTime": "2025-11-06T11:36:42Z"
+	},
+	"type": "Microsoft.DataFactory/factories/pipelines"
+}

@@ -1,0 +1,38 @@
+{
+	"name": "DS_bv_lp",
+	"properties": {
+		"linkedServiceName": {
+			"referenceName": "ls_bv_sqldb",
+			"type": "LinkedServiceReference"
+		},
+		"annotations": [],
+		"type": "AzureSqlTable",
+		"schema": [
+			{
+				"name": "table_name",
+				"type": "varchar"
+			},
+			{
+				"name": "source_name",
+				"type": "varchar"
+			},
+			{
+				"name": "table_type",
+				"type": "varchar"
+			},
+			{
+				"name": "incremental_col",
+				"type": "varchar"
+			},
+			{
+				"name": "ingestion_dt",
+				"type": "varchar"
+			}
+		],
+		"typeProperties": {
+			"schema": "veerab62",
+			"table": "cntrl_tbl"
+		}
+	},
+	"type": "Microsoft.DataFactory/factories/datasets"
+}
